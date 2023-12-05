@@ -10,6 +10,17 @@ from contextlib import (
     redirect_stdout,
 )
 
+OBS_ELEMENT_INDICES = {
+    'bottom burner': np.array([11, 12]),
+    'top burner': np.array([15, 16]),
+    'light switch': np.array([17, 18]),
+    'slide cabinet': np.array([19]),
+    'hinge cabinet': np.array([20, 21]),
+    'microwave': np.array([22]),
+    'kettle': np.array([23, 24, 25, 26, 27, 28, 29]),
+    }
+BONUS_THRESH = 0.3
+
 @contextmanager
 def suppress_output():
     """
@@ -69,7 +80,7 @@ def sequence_dataset(env, preprocess_fn):
     """
     dataset = get_dataset(env)
     dataset = preprocess_fn(dataset)
-
+    
     N = dataset['rewards'].shape[0]
     data_ = collections.defaultdict(list)
 
@@ -96,11 +107,28 @@ def sequence_dataset(env, preprocess_fn):
                 episode_data[k] = np.array(data_[k])
             if 'maze2d' in env.name:
                 episode_data = process_maze2d_episode(episode_data)
+            
+            # Create text condition
+            episode_data['text_cond'] = np.empty_like(episode_data['rewards'], dtype=object)
+            target_task = list(env.tasks_to_complete)
+            complete_task = []
+            inds = np.where((episode_data['rewards'][:-1] - episode_data['rewards'][1:])==-1)[0]+1
+            for ind in inds:
+                for task in target_task:
+                    if np.linalg.norm(episode_data['observations'][ind][..., OBS_ELEMENT_INDICES[task]] - dataset['observations'][ind][..., 30 + OBS_ELEMENT_INDICES[task]]) < BONUS_THRESH and \
+                        np.linalg.norm(episode_data['observations'][ind-1][..., OBS_ELEMENT_INDICES[task]] - dataset['observations'][ind-1][..., 30 + OBS_ELEMENT_INDICES[task]]) > BONUS_THRESH:
+                        complete_task.append(task)
+                        break
+            assert len(inds) == len(complete_task)
+            inds = [0] + inds.tolist()
+            for i in range(len(complete_task)):
+                episode_data['text_cond'][inds[i]:inds[i+1]].fill(complete_task[i])
+
             yield episode_data
             data_ = collections.defaultdict(list)
 
         episode_step += 1
-
+    
 
 #-----------------------------------------------------------------------------#
 #-------------------------------- maze2d fixes -------------------------------#

@@ -5,13 +5,14 @@ import pdb
 
 from .preprocessing import get_preprocess_fn
 from .d4rl import load_environment, sequence_dataset
+from d4rl.kitchen.kitchen_envs import KitchenTaskRelaxV1
 from .normalization import DatasetNormalizer
 from .buffer import ReplayBuffer
 
-RewardBatch = namedtuple('Batch', 'trajectories conditions returns')
-Batch = namedtuple('Batch', 'trajectories conditions')
+RewardBatch = namedtuple('Batch', 'trajectories conditions returns text_cond')
+Batch = namedtuple('Batch', 'trajectories conditions text_cond')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
-
+        
 class SequenceDataset(torch.utils.data.Dataset):
 
     def __init__(self, env='hopper-medium-replay', horizon=64,
@@ -77,7 +78,6 @@ class SequenceDataset(torch.utils.data.Dataset):
             condition on current observation for planning
         '''
         return {0: observations[0]}
-        # return observations[0]
 
     def __len__(self):
         return len(self.indices)
@@ -87,6 +87,7 @@ class SequenceDataset(torch.utils.data.Dataset):
 
         observations = self.fields.normed_observations[path_ind, start:end]
         actions = self.fields.normed_actions[path_ind, start:end]
+        text_cond = self.fields.text_cond[path_ind, start:end]
 
         conditions = self.get_conditions(observations)
         trajectories = np.concatenate([actions, observations], axis=-1)
@@ -96,9 +97,9 @@ class SequenceDataset(torch.utils.data.Dataset):
             discounts = self.discounts[:len(rewards)]
             returns = (discounts * rewards).sum()
             returns = np.array([returns/self.returns_scale], dtype=np.float32)
-            batch = RewardBatch(trajectories, conditions, returns)
+            batch = RewardBatch(trajectories, conditions, returns, text_cond)
         else:
-            batch = Batch(trajectories, conditions)
+            batch = Batch(trajectories, conditions, text_cond)
 
         return batch
 
