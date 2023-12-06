@@ -99,12 +99,12 @@ class SequenceDataset(torch.utils.data.Dataset):
         text_features = torch.zeros(len(text_cond), 512)
         if None in text_cond:
             text_cond = text_cond[:text_cond.index(None)]
-        
-        text_cond = clip.tokenize(text_cond).to(self.device)
-        with torch.no_grad():
-            text_cond = self.clip.encode_text(text_cond)
-        # print(text_cond.shape)
-        text_features[:len(text_cond), :] = text_cond
+        if len(text_cond) != 0:
+            text_cond = clip.tokenize(text_cond).to(self.device)
+            with torch.no_grad():
+                text_cond = self.clip.encode_text(text_cond)
+            # print(text_cond.shape)
+            text_features[:len(text_cond), :] = text_cond
         
         
         conditions = self.get_conditions(observations)

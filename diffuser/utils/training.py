@@ -113,6 +113,7 @@ class Trainer(object):
             for i in range(self.gradient_accumulate_every):
                 batch = next(self.dataloader)
                 batch = batch_to_device(batch, device=self.device)
+                # print(batch)
                 # breakpoint()
                 loss, infos = self.model.loss(*batch)
                 loss = loss / self.gradient_accumulate_every

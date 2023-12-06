@@ -161,6 +161,8 @@ def main(**deps):
 
     logger.print('Testing forward...', end=' ', flush=True)
     batch = utils.batchify(dataset[0], Config.device)
+    # print(batch)
+    # breakpoint()
     loss, _ = diffusion.loss(*batch)
     loss.backward()
     logger.print('✓')
