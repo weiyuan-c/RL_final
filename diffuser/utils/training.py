@@ -113,6 +113,7 @@ class Trainer(object):
             for i in range(self.gradient_accumulate_every):
                 batch = next(self.dataloader)
                 batch = batch_to_device(batch, device=self.device)
+                # print(batch)
                 # breakpoint()
                 loss, infos = self.model.loss(*batch)
                 loss = loss / self.gradient_accumulate_every
@@ -287,7 +288,7 @@ class Trainer(object):
                 conditions,
                 'b d -> (repeat b) d', repeat=n_samples,
             )
-            text_cond = batch.text_cond
+            text_cond = to_device(batch.text_cond, self.device)
 
             ## [ n_samples x horizon x (action_dim + observation_dim) ]
             if self.ema_model.returns_condition:

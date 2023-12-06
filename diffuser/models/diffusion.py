@@ -437,7 +437,6 @@ class GaussianInvDynDiffusion(nn.Module):
 
         batch_size = shape[0]
         x = 0.5*torch.randn(shape, device=device)
-        print(x.shape)
         x = apply_conditioning(x, cond, 0)
 
         if return_diffusion: diffusion = [x]

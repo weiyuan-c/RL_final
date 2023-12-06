@@ -107,13 +107,14 @@ class ResidualTemporalBlock(nn.Module):
             returns:
             out : [ batch_size x out_channels x horizon ]
         '''
-        print(x.shape)
-        print(self.blocks[0](x).shape)
-        text_cond = self.cond_mlp(cond)
-        text_cond = einops.rearrange(text_cond, 'b h t -> b t h')
-        out = self.blocks[0](x) + self.time_mlp(t) + text_cond
-        # out += text_cond[:,:,:out.size(-1)]
+        # print(x.shape)
         # breakpoint()
+        out = self.blocks[0](x) + self.time_mlp(t)
+        if cond is not None:
+            text_cond = self.cond_mlp(cond)
+            text_cond = einops.rearrange(text_cond, 'b h t -> b t h')
+            out += text_cond
+
         out = self.blocks[1](out)
 
         return out + self.residual_conv(x)
@@ -134,9 +135,12 @@ class TemporalUnet(nn.Module):
     ):
         super().__init__()
 
-        dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
-        in_out = list(zip(dims[:-1], dims[1:]))
-        print(f'[ models/temporal ] Channel dimensions: {in_out}')
+        dims = [128, *map(lambda m: dim * m, dim_mults)]
+        down_in_out = list(zip(dims[:-1], dims[1:]))
+        dims[0] = transition_dim
+        up_in_out = list(zip(dims[:-1], dims[1:]))
+        text_out = [(60, 128), (128, 128)]
+        # print(f'[ models/temporal ] Channel dimensions: {down_in_out}')
 
         if calc_energy:
             mish = False
@@ -203,10 +207,17 @@ class TemporalUnet(nn.Module):
 
         self.downs = nn.ModuleList([])
         self.ups = nn.ModuleList([])
-        num_resolutions = len(in_out)
+        num_resolutions = len(down_in_out)
 
-        print(in_out)
-        for ind, (dim_in, dim_out) in enumerate(in_out):
+        self.text_module = nn.ModuleList([]) 
+        for ind, (dim_in, dim_out) in enumerate(text_out):
+            self.text_module.append(nn.ModuleList([
+                ResidualTemporalBlock(dim_in, dim_out, embed_dim=embed_dim, horizon=horizon, kernel_size=kernel_size, mish=mish),
+                ResidualTemporalBlock(dim_out, dim_out, embed_dim=embed_dim, horizon=horizon, kernel_size=kernel_size, mish=mish),
+            ]))
+        
+        print(down_in_out)
+        for ind, (dim_in, dim_out) in enumerate(down_in_out):
             is_last = ind >= (num_resolutions - 1)
 
             self.downs.append(nn.ModuleList([
@@ -218,11 +229,12 @@ class TemporalUnet(nn.Module):
             if not is_last:
                 horizon = horizon // 2
 
+
         mid_dim = dims[-1]
         self.mid_block1 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=embed_dim, horizon=horizon, kernel_size=kernel_size, mish=mish)
         self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=embed_dim, horizon=horizon, kernel_size=kernel_size, mish=mish)
 
-        for ind, (dim_in, dim_out) in enumerate(reversed(in_out[1:])):
+        for ind, (dim_in, dim_out) in enumerate(reversed(up_in_out[1:])):
             is_last = ind >= (num_resolutions - 1)
 
             self.ups.append(nn.ModuleList([
@@ -246,7 +258,6 @@ class TemporalUnet(nn.Module):
         '''
         if self.calc_energy:
             x_inp = x
-        print(x.shape)
         x = einops.rearrange(x, 'b h t -> b t h')
         t = self.time_mlp(time)
         c = self.cond_mlp(cond)
@@ -261,10 +272,14 @@ class TemporalUnet(nn.Module):
             if force_dropout:
                 returns_embed = 0*returns_embed
             t = torch.cat([t, returns_embed], dim=-1)
-        # breakpoint()
 
         h = []
 
+        for resnet, resnet2 in self.text_module:
+            x = resnet(x, t, c)
+            x = resnet2(x, t, c)
+        
+        c = None
         for resnet, resnet2, downsample in self.downs:
             x = resnet(x, t, c)
             x = resnet2(x, t, c)
