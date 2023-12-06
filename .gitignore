@@ -3,3 +3,5 @@
 *.pt
 *.pyc
 *.ipynb
+*.pkl
+analysis/diffuser/*

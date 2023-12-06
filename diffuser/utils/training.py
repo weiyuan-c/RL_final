@@ -6,7 +6,7 @@ import einops
 import pdb
 import diffuser
 from copy import deepcopy
-
+from torch.utils.data._utils.collate import default_collate
 from .arrays import batch_to_device, to_np, to_device, apply_dict
 from .timer import Timer
 from .cloud import sync_logs
