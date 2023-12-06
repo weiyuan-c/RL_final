@@ -88,7 +88,10 @@ class SequenceDataset(torch.utils.data.Dataset):
         observations = self.fields.normed_observations[path_ind, start:end]
         actions = self.fields.normed_actions[path_ind, start:end]
         text_cond = self.fields.text_cond[path_ind, start:end]
-
+        print(text_cond.shape)
+        
+        # CLIP features
+        
         conditions = self.get_conditions(observations)
         trajectories = np.concatenate([actions, observations], axis=-1)
 
