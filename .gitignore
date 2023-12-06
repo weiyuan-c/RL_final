@@ -4,4 +4,4 @@
 *.pyc
 *.ipynb
 *.pkl
-analysis/diffuser/*
+analysis/diffuser

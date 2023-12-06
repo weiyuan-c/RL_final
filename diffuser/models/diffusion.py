@@ -401,11 +401,11 @@ class GaussianInvDynDiffusion(nn.Module):
         posterior_log_variance_clipped = extract(self.posterior_log_variance_clipped, t, x_t.shape)
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
-    def p_mean_variance(self, x, cond, t, returns=None):
+    def p_mean_variance(self, x, cond, t, returns=None, text_cond=None):
         if self.returns_condition:
             # epsilon could be epsilon or x0 itself
-            epsilon_cond = self.model(x, cond, t, returns, use_dropout=False)
-            epsilon_uncond = self.model(x, cond, t, returns, force_dropout=True)
+            epsilon_cond = self.model(x, text_cond, t, returns, use_dropout=False)
+            epsilon_uncond = self.model(x, text_cond, t, returns, force_dropout=True)
             epsilon = epsilon_uncond + self.condition_guidance_w*(epsilon_cond - epsilon_uncond)
         else:
             epsilon = self.model(x, cond, t)
@@ -423,20 +423,21 @@ class GaussianInvDynDiffusion(nn.Module):
         return model_mean, posterior_variance, posterior_log_variance
 
     @torch.no_grad()
-    def p_sample(self, x, cond, t, returns=None):
+    def p_sample(self, x, cond, t, returns=None, text_cond=None):
         b, *_, device = *x.shape, x.device
-        model_mean, _, model_log_variance = self.p_mean_variance(x=x, cond=cond, t=t, returns=returns)
+        model_mean, _, model_log_variance = self.p_mean_variance(x=x, cond=cond, t=t, returns=returns, text_cond=text_cond)
         noise = 0.5*torch.randn_like(x)
         # no noise when t == 0
         nonzero_mask = (1 - (t == 0).float()).reshape(b, *((1,) * (len(x.shape) - 1)))
         return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
 
     @torch.no_grad()
-    def p_sample_loop(self, shape, cond, returns=None, verbose=True, return_diffusion=False):
+    def p_sample_loop(self, shape, cond, returns=None, text_cond=None, verbose=True, return_diffusion=False):
         device = self.betas.device
 
         batch_size = shape[0]
         x = 0.5*torch.randn(shape, device=device)
+        print(x.shape)
         x = apply_conditioning(x, cond, 0)
 
         if return_diffusion: diffusion = [x]
@@ -444,7 +445,7 @@ class GaussianInvDynDiffusion(nn.Module):
         progress = utils.Progress(self.n_timesteps) if verbose else utils.Silent()
         for i in reversed(range(0, self.n_timesteps)):
             timesteps = torch.full((batch_size,), i, device=device, dtype=torch.long)
-            x = self.p_sample(x, cond, timesteps, returns)
+            x = self.p_sample(x, cond, timesteps, returns, text_cond)
             x = apply_conditioning(x, cond, 0)
 
             progress.update({'t': i})
@@ -459,7 +460,7 @@ class GaussianInvDynDiffusion(nn.Module):
             return x
 
     @torch.no_grad()
-    def conditional_sample(self, cond, returns=None, horizon=None, *args, **kwargs):
+    def conditional_sample(self, cond, returns=None, horizon=None, text_cond=None, *args, **kwargs):
         '''
             conditions : [ (time, state), ... ]
         '''
@@ -468,7 +469,7 @@ class GaussianInvDynDiffusion(nn.Module):
         horizon = horizon or self.horizon
         shape = (batch_size, horizon, self.observation_dim)
 
-        return self.p_sample_loop(shape, cond, returns, *args, **kwargs)
+        return self.p_sample_loop(shape, cond, returns, text_cond, *args, **kwargs)
     #------------------------------------------ training ------------------------------------------#
 
     def q_sample(self, x_start, t, noise=None):

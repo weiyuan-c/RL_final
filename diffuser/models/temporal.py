@@ -107,10 +107,12 @@ class ResidualTemporalBlock(nn.Module):
             returns:
             out : [ batch_size x out_channels x horizon ]
         '''
+        print(x.shape)
+        print(self.blocks[0](x).shape)
         text_cond = self.cond_mlp(cond)
         text_cond = einops.rearrange(text_cond, 'b h t -> b t h')
-        out = self.blocks[0](x) + self.time_mlp(t)
-        out += text_cond[:,:,:out.size(-1)]
+        out = self.blocks[0](x) + self.time_mlp(t) + text_cond
+        # out += text_cond[:,:,:out.size(-1)]
         # breakpoint()
         out = self.blocks[1](out)
 
@@ -244,7 +246,7 @@ class TemporalUnet(nn.Module):
         '''
         if self.calc_energy:
             x_inp = x
-
+        print(x.shape)
         x = einops.rearrange(x, 'b h t -> b t h')
         t = self.time_mlp(time)
         c = self.cond_mlp(cond)

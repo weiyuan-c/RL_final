@@ -287,6 +287,7 @@ class Trainer(object):
                 conditions,
                 'b d -> (repeat b) d', repeat=n_samples,
             )
+            text_cond = batch.text_cond
 
             ## [ n_samples x horizon x (action_dim + observation_dim) ]
             if self.ema_model.returns_condition:
@@ -297,7 +298,7 @@ class Trainer(object):
             if self.ema_model.model.calc_energy:
                 samples = self.ema_model.grad_conditional_sample(conditions, returns=returns)
             else:
-                samples = self.ema_model.conditional_sample(conditions, returns=returns)
+                samples = self.ema_model.conditional_sample(conditions, returns=returns, text_cond=text_cond)
 
             samples = to_np(samples)
 
