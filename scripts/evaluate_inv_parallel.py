@@ -8,6 +8,9 @@ import gym
 from config.locomotion_config import Config
 from diffuser.utils.arrays import to_torch, to_np, to_device
 from diffuser.datasets.d4rl import suppress_output
+from diffuser.utils.rendering import save_imgs_as_gif
+# from .render_one_epoch import run_one_epoch
+import pdb
 
 def evaluate(**deps):
     from ml_logger import logger, RUN
@@ -53,15 +56,14 @@ def evaluate(**deps):
         returns_scale=Config.returns_scale,
     )
 
-    render_config = utils.Config(
-        Config.renderer,
-        savepath='render_config.pkl',
-        env=Config.dataset,
-    )
+    # render_config = utils.Config(
+    #     Config.renderer,
+    #     savepath='render_config.pkl',
+    #     env=Config.dataset,
+    # )
 
     dataset = dataset_config()
-    renderer = render_config()
-
+    # renderer = render_config()
     observation_dim = dataset.observation_dim
     action_dim = dataset.action_dim
 
@@ -121,7 +123,8 @@ def evaluate(**deps):
 
     model = model_config()
     diffusion = diffusion_config(model)
-    trainer = trainer_config(diffusion, dataset, renderer)
+    trainer = trainer_config(diffusion, dataset, None)
+    # trainer = trainer_config(diffusion, dataset, renderer)
     logger.print(utils.report_parameters(model), color='green')
     trainer.step = state_dict['step']
     trainer.model.load_state_dict(state_dict['model'])
@@ -131,14 +134,19 @@ def evaluate(**deps):
     device = Config.device
 
     env_list = [gym.make(Config.dataset) for _ in range(num_eval)]
+    renderer = [env.sim_robot.renderer for env in env_list]
+    rendered_frames = [[] for env in env_list]
     dones = [0 for _ in range(num_eval)]
     episode_rewards = [0 for _ in range(num_eval)]
+
+    run_one_epoch(env_list[0], dataset)
 
     assert trainer.ema_model.condition_guidance_w == Config.condition_guidance_w
     returns = to_device(Config.test_ret * torch.ones(num_eval, 1), device)
 
     t = 0
     obs_list = [env.reset()[None] for env in env_list]
+    pdb.set_trace()
     obs = np.concatenate(obs_list, axis=0)
     recorded_obs = [deepcopy(obs[:, None])]
 
@@ -159,11 +167,13 @@ def evaluate(**deps):
             normed_observations = samples[:, :, :]
             observations = dataset.normalizer.unnormalize(normed_observations, 'observations')
             savepath = os.path.join('images', 'sample-planned.png')
-            renderer.composite(savepath, observations)
+            # renderer.composite(savepath, observations)
 
         obs_list = []
         for i in range(num_eval):
             this_obs, this_reward, this_done, _ = env_list[i].step(action[i])
+            frame = renderer[i].render_offscreen(512, 384, camera_id=-1)
+            rendered_frames[i].append(frame)
             obs_list.append(this_obs[None])
             if this_done:
                 if dones[i] == 1:
@@ -182,9 +192,12 @@ def evaluate(**deps):
         recorded_obs.append(deepcopy(obs[:, None]))
         t += 1
 
+    for i in range(num_eval):
+        save_imgs_as_gif(rendered_frames[i], f"kitchen_{i}.gif")
+
     recorded_obs = np.concatenate(recorded_obs, axis=1)
-    savepath = os.path.join('images', f'sample-executed.png')
-    renderer.composite(savepath, recorded_obs)
+    # savepath = os.path.join('images', f'sample-executed.png')
+    # renderer.composite(savepath, recorded_obs)
     episode_rewards = np.array(episode_rewards)
 
     logger.print(f"average_ep_reward: {np.mean(episode_rewards)}, std_ep_reward: {np.std(episode_rewards)}", color='green')
