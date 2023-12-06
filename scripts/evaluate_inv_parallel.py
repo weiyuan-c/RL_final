@@ -139,14 +139,13 @@ def evaluate(**deps):
     dones = [0 for _ in range(num_eval)]
     episode_rewards = [0 for _ in range(num_eval)]
 
-    run_one_epoch(env_list[0], dataset)
+    # run_one_epoch(env_list[0], dataset)
 
     assert trainer.ema_model.condition_guidance_w == Config.condition_guidance_w
     returns = to_device(Config.test_ret * torch.ones(num_eval, 1), device)
 
     t = 0
     obs_list = [env.reset()[None] for env in env_list]
-    pdb.set_trace()
     obs = np.concatenate(obs_list, axis=0)
     recorded_obs = [deepcopy(obs[:, None])]
 
