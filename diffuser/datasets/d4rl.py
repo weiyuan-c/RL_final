@@ -109,7 +109,7 @@ def sequence_dataset(env, preprocess_fn):
                 episode_data = process_maze2d_episode(episode_data)
             
             # Create text condition
-            episode_data['text_cond'] = np.squeeze(np.empty_like(episode_data['rewards'], dtype=object), axis=1)
+            episode_data['text_cond'] = np.empty_like(episode_data['rewards'], dtype=object)
             target_task = list(env.tasks_to_complete)
             complete_task = []
             inds = np.where((episode_data['rewards'][:-1] - episode_data['rewards'][1:])==-1)[0]+1
@@ -123,7 +123,6 @@ def sequence_dataset(env, preprocess_fn):
             inds = [0] + inds.tolist()
             for i in range(len(complete_task)):
                 episode_data['text_cond'][inds[i]:inds[i+1]].fill(complete_task[i])
-
             yield episode_data
             data_ = collections.defaultdict(list)
 

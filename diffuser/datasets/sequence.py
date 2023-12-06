@@ -87,9 +87,7 @@ class SequenceDataset(torch.utils.data.Dataset):
 
         observations = self.fields.normed_observations[path_ind, start:end]
         actions = self.fields.normed_actions[path_ind, start:end]
-        text_cond = self.fields.text_cond[path_ind, start:end]
-        print(text_cond.shape)
-        
+        text_cond = np.squeeze(self.fields.text_cond[path_ind, start:end], axis=1).tolist()
         # CLIP features
         
         conditions = self.get_conditions(observations)
