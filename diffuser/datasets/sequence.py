@@ -2,7 +2,8 @@ from collections import namedtuple
 import numpy as np
 import torch
 import pdb
-
+import clip
+from config.locomotion_config import Config
 from .preprocessing import get_preprocess_fn
 from .d4rl import load_environment, sequence_dataset
 from d4rl.kitchen.kitchen_envs import KitchenTaskRelaxV1
@@ -48,6 +49,10 @@ class SequenceDataset(torch.utils.data.Dataset):
         # shapes = {key: val.shape for key, val in self.fields.items()}
         # print(f'[ datasets/mujoco ] Dataset fields: {shapes}')
 
+        # clip model
+        self.device = Config.device
+        self.clip, _ = clip.load("ViT-B/32", device=self.device)
+
     def normalize(self, keys=['observations', 'actions']):
         '''
             normalize fields that will be predicted by the diffusion model
@@ -89,6 +94,17 @@ class SequenceDataset(torch.utils.data.Dataset):
         actions = self.fields.normed_actions[path_ind, start:end]
         text_cond = np.squeeze(self.fields.text_cond[path_ind, start:end], axis=1).tolist()
         # CLIP features
+        # [microwave, microwave, ...]
+        text_features = torch.zeros(len(text_cond), 512)
+        
+        if None in text_cond:
+            text_cond = text_cond[:text_cond.index(None)]
+        
+        text_cond = clip.tokenize(text_cond).to(self.device)
+        with torch.no_grad():
+            text_cond = self.clip.encode_text(text_cond)
+        text_features[:len(text_cond), :] = text_cond
+        
         
         conditions = self.get_conditions(observations)
         trajectories = np.concatenate([actions, observations], axis=-1)
