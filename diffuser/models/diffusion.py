@@ -303,10 +303,6 @@ class GaussianInvDynDiffusion(nn.Module):
         self.ar_inv = ar_inv
         self.train_only_inv = train_only_inv
 
-        # Text embedding
-        device = Config.device
-        self.proj_layer = nn.Linear(512, self.observation_dim)
-
         if self.ar_inv:
             self.inv_model = ARInvModel(hidden_dim=hidden_dim, observation_dim=observation_dim, action_dim=action_dim)
         else:
@@ -486,13 +482,13 @@ class GaussianInvDynDiffusion(nn.Module):
 
         return sample
 
-    def p_losses(self, x_start, cond, t, returns=None):
+    def p_losses(self, x_start, cond, t, returns=None, text_cond=None):
         noise = torch.randn_like(x_start)
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         x_noisy = apply_conditioning(x_noisy, cond, 0)
 
-        x_recon = self.model(x_noisy, cond, t, returns)
+        x_recon = self.model(x_noisy, text_cond, t, returns)
 
         if not self.predict_epsilon:
             x_recon = apply_conditioning(x_recon, cond, 0)
@@ -525,7 +521,7 @@ class GaussianInvDynDiffusion(nn.Module):
         else:
             batch_size = len(x)
             t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
-            diffuse_loss, info = self.p_losses(x[:, :, self.action_dim:], cond, t, returns)
+            diffuse_loss, info = self.p_losses(x[:, :, self.action_dim:], cond, t, returns, text_cond)
             # Calculating inv loss
             x_t = x[:, :-1, self.action_dim:]
             a_t = x[:, :-1, :self.action_dim]

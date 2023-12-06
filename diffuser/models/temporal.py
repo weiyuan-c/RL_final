@@ -94,7 +94,7 @@ class ResidualTemporalBlock(nn.Module):
         self.cond_mlp = nn.Sequential(
             act_fn,
             nn.Linear(embed_dim, out_channels),
-            Rearrange('batch t -> batch t 1')
+            # Rearrange('batch t -> batch t 1')
         )
 
         self.residual_conv = nn.Conv1d(inp_channels, out_channels, 1) \
@@ -107,7 +107,10 @@ class ResidualTemporalBlock(nn.Module):
             returns:
             out : [ batch_size x out_channels x horizon ]
         '''
-        out = self.blocks[0](x) + self.time_mlp(t) + self.cond_mlp(cond)
+        text_cond = self.cond_mlp(cond)
+        text_cond = einops.rearrange(text_cond, 'b h t -> b t h')
+        out = self.blocks[0](x) + self.time_mlp(t)
+        out += text_cond[:,:,:out.size(-1)]
         # breakpoint()
         out = self.blocks[1](out)
 
@@ -154,12 +157,6 @@ class TemporalUnet(nn.Module):
         self.condition_dropout = condition_dropout
         self.calc_energy = calc_energy
 
-        # add text embedding
-        clip_model, _ = clip.load("ViT-B/32", device=Config.device)
-        clip_model.float()
-        with torch.no_grad():
-            self.text_feats = clip_model.encode_text(clip.tokenize("a robot is hopping").to(Config.device))
-        del clip_model
         
         # add time condition
         if self.returns_condition:
@@ -249,9 +246,8 @@ class TemporalUnet(nn.Module):
             x_inp = x
 
         x = einops.rearrange(x, 'b h t -> b t h')
-
         t = self.time_mlp(time)
-        c = self.cond_mlp(self.text_feats.expand(x.size(0), -1))
+        c = self.cond_mlp(cond)
         # breakpoint()
 
         if self.returns_condition:
@@ -304,7 +300,7 @@ class TemporalUnet(nn.Module):
         x = einops.rearrange(x, 'b h t -> b t h')
 
         t = self.time_mlp(time)
-        c = self.cond_mlp(self.text_feats.expand(x.size(0), -1))
+        c = self.cond_mlp(cond)
 
         if self.returns_condition:
             assert returns is not None

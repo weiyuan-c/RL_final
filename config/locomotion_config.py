@@ -6,7 +6,7 @@ class Config(ParamsProto):
     # misc
     seed = 100
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    bucket = '/home/sonicbenz/Benz/course/RL/decision-diffuser/code/analysis/weights/'#'/home/yanyangji/research/RL/final/decision-diffuser/code/output'
+    bucket = '/home/yanyangji/research/RL/final/decision-diffuser/code/output'
     dataset = 'kitchen-mixed-v0' #'hopper-medium-expert-v2'
 
     ## model
