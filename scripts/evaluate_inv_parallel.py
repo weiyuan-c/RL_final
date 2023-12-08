@@ -5,13 +5,9 @@ from copy import deepcopy
 import numpy as np
 import os
 import gym
-import clip
 from config.locomotion_config import Config
 from diffuser.utils.arrays import to_torch, to_np, to_device
 from diffuser.datasets.d4rl import suppress_output
-from diffuser.utils.rendering import save_imgs_as_gif
-from .render_one_epoch import run_one_epoch
-import pdb
 
 def evaluate(**deps):
     from ml_logger import logger, RUN
@@ -33,10 +29,10 @@ def evaluate(**deps):
 
     loadpath = os.path.join(Config.bucket, logger.prefix, 'checkpoint')
     
-    # if Config.save_checkpoints:
-    #     loadpath = os.path.join(loadpath, f'state_{self.step}.pt')
-    # else:
-    loadpath = os.path.join(loadpath, 'state.pt')
+    if Config.save_checkpoints:
+        loadpath = os.path.join(loadpath, f'state_{self.step}.pt')
+    else:
+        loadpath = os.path.join(loadpath, 'state.pt')
     
     state_dict = torch.load(loadpath, map_location=Config.device)
 
@@ -57,14 +53,15 @@ def evaluate(**deps):
         returns_scale=Config.returns_scale,
     )
 
-    # render_config = utils.Config(
-    #     Config.renderer,
-    #     savepath='render_config.pkl',
-    #     env=Config.dataset,
-    # )
+    render_config = utils.Config(
+        Config.renderer,
+        savepath='render_config.pkl',
+        env=Config.dataset,
+    )
 
     dataset = dataset_config()
-    # renderer = render_config()
+    renderer = render_config()
+
     observation_dim = dataset.observation_dim
     action_dim = dataset.action_dim
 
@@ -124,28 +121,16 @@ def evaluate(**deps):
 
     model = model_config()
     diffusion = diffusion_config(model)
-    trainer = trainer_config(diffusion, dataset, None)
-    # trainer = trainer_config(diffusion, dataset, renderer)
+    trainer = trainer_config(diffusion, dataset, renderer)
     logger.print(utils.report_parameters(model), color='green')
     trainer.step = state_dict['step']
     trainer.model.load_state_dict(state_dict['model'])
     trainer.ema_model.load_state_dict(state_dict['ema'])
 
-    num_eval = 1
+    num_eval = 10
     device = Config.device
 
     env_list = [gym.make(Config.dataset) for _ in range(num_eval)]
-    # Change tasks
-    for i in range(len(env_list)):
-        env_list[i].tasks_to_complete = ['kettle', 'light switch', 'microwave', 'slide cabinet']
-
-    renderer = [env.sim_robot.renderer for env in env_list]
-    for i in range(len(renderer)):
-        renderer[i]._camera_settings['azimuth'] = 90.
-        renderer[i]._camera_settings['elevation'] = -10.
-        renderer[i]._camera_settings['lookat'][1] = 0.0
-        renderer[i]._camera_settings['distance'] = 3.0
-    rendered_frames = [[] for env in env_list]
     dones = [0 for _ in range(num_eval)]
     episode_rewards = [0 for _ in range(num_eval)]
 
@@ -160,11 +145,7 @@ def evaluate(**deps):
     while sum(dones) <  num_eval:
         obs = dataset.normalizer.normalize(obs, 'observations')
         conditions = {0: to_torch(obs, device=device)}
-        text_cond = []
-        for i in range(len(env_list)):
-            text_cond.append(env_list[i].tasks_to_complete[0])
-        text_cond = dataset.clip.encode_text(clip.tokenize(text_cond).to(device)).unsqueeze(1).repeat(1, Config.horizon, 1)
-        samples = trainer.ema_model.conditional_sample(conditions, returns=returns, text_cond=text_cond)
+        samples = trainer.ema_model.conditional_sample(conditions, returns=returns)
         obs_comb = torch.cat([samples[:, 0, :], samples[:, 1, :]], dim=-1)
         obs_comb = obs_comb.reshape(-1, 2*observation_dim)
         action = trainer.ema_model.inv_model(obs_comb)
@@ -178,13 +159,11 @@ def evaluate(**deps):
             normed_observations = samples[:, :, :]
             observations = dataset.normalizer.unnormalize(normed_observations, 'observations')
             savepath = os.path.join('images', 'sample-planned.png')
-            # renderer.composite(savepath, observations)
+            renderer.composite(savepath, observations)
 
         obs_list = []
         for i in range(num_eval):
             this_obs, this_reward, this_done, _ = env_list[i].step(action[i])
-            frame = renderer[i].render_offscreen(512, 384, camera_id=-1)
-            rendered_frames[i].append(frame)
             obs_list.append(this_obs[None])
             if this_done:
                 if dones[i] == 1:
@@ -203,12 +182,9 @@ def evaluate(**deps):
         recorded_obs.append(deepcopy(obs[:, None]))
         t += 1
 
-    for i in range(num_eval):
-        save_imgs_as_gif(rendered_frames[i], f"kitchen_{i}.gif")
-
     recorded_obs = np.concatenate(recorded_obs, axis=1)
-    # savepath = os.path.join('images', f'sample-executed.png')
-    # renderer.composite(savepath, recorded_obs)
+    savepath = os.path.join('images', f'sample-executed.png')
+    renderer.composite(savepath, recorded_obs)
     episode_rewards = np.array(episode_rewards)
 
     logger.print(f"average_ep_reward: {np.mean(episode_rewards)}, std_ep_reward: {np.std(episode_rewards)}", color='green')

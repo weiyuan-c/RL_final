@@ -68,7 +68,6 @@ def apply_dict(fn, d, *args, **kwargs):
 		k: fn(v, *args, **kwargs)
 		for k, v in d.items()
 	}
-	# return d
 
 def normalize(x):
 	"""

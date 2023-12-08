@@ -2,18 +2,16 @@ from collections import namedtuple
 import numpy as np
 import torch
 import pdb
-import clip
-from config.locomotion_config import Config
+
 from .preprocessing import get_preprocess_fn
 from .d4rl import load_environment, sequence_dataset
-from d4rl.kitchen.kitchen_envs import KitchenTaskRelaxV1
 from .normalization import DatasetNormalizer
 from .buffer import ReplayBuffer
 
-RewardBatch = namedtuple('Batch', 'trajectories conditions returns text_cond')
-Batch = namedtuple('Batch', 'trajectories conditions text_cond')
+RewardBatch = namedtuple('Batch', 'trajectories conditions returns')
+Batch = namedtuple('Batch', 'trajectories conditions')
 ValueBatch = namedtuple('ValueBatch', 'trajectories conditions values')
-        
+
 class SequenceDataset(torch.utils.data.Dataset):
 
     def __init__(self, env='hopper-medium-replay', horizon=64,
@@ -48,12 +46,6 @@ class SequenceDataset(torch.utils.data.Dataset):
         print(fields)
         # shapes = {key: val.shape for key, val in self.fields.items()}
         # print(f'[ datasets/mujoco ] Dataset fields: {shapes}')
-
-        # clip model
-        self.device = Config.device
-        self.clip, _ = clip.load("ViT-B/32", device=self.device)
-        self.clip.float()
-        self.clip.eval()
 
     def normalize(self, keys=['observations', 'actions']):
         '''
@@ -94,19 +86,7 @@ class SequenceDataset(torch.utils.data.Dataset):
 
         observations = self.fields.normed_observations[path_ind, start:end]
         actions = self.fields.normed_actions[path_ind, start:end]
-        text_cond = np.squeeze(self.fields.text_cond[path_ind, start:end], axis=1).tolist()
-        # CLIP features
-        # [microwave, microwave, ...]
-        text_features = torch.zeros(len(text_cond), 512)
-        if None in text_cond:
-            text_cond = text_cond[:text_cond.index(None)]
-        if len(text_cond) != 0:
-            text_cond = clip.tokenize(text_cond).to(self.device)
-            with torch.no_grad():
-                text_cond = self.clip.encode_text(text_cond)
-            # print(text_cond.shape)
-            text_features[:len(text_cond), :] = text_cond
-        
+
         conditions = self.get_conditions(observations)
         trajectories = np.concatenate([actions, observations], axis=-1)
 
@@ -115,9 +95,9 @@ class SequenceDataset(torch.utils.data.Dataset):
             discounts = self.discounts[:len(rewards)]
             returns = (discounts * rewards).sum()
             returns = np.array([returns/self.returns_scale], dtype=np.float32)
-            batch = RewardBatch(trajectories, conditions, returns, text_features)
+            batch = RewardBatch(trajectories, conditions, returns)
         else:
-            batch = Batch(trajectories, conditions, text_features)
+            batch = Batch(trajectories, conditions)
 
         return batch
 

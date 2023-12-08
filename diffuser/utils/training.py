@@ -6,7 +6,7 @@ import einops
 import pdb
 import diffuser
 from copy import deepcopy
-from torch.utils.data._utils.collate import default_collate
+
 from .arrays import batch_to_device, to_np, to_device, apply_dict
 from .timer import Timer
 from .cloud import sync_logs
@@ -113,8 +113,6 @@ class Trainer(object):
             for i in range(self.gradient_accumulate_every):
                 batch = next(self.dataloader)
                 batch = batch_to_device(batch, device=self.device)
-                # print(batch)
-                # breakpoint()
                 loss, infos = self.model.loss(*batch)
                 loss = loss / self.gradient_accumulate_every
                 loss.backward()
@@ -288,7 +286,6 @@ class Trainer(object):
                 conditions,
                 'b d -> (repeat b) d', repeat=n_samples,
             )
-            text_cond = to_device(batch.text_cond, self.device)
 
             ## [ n_samples x horizon x (action_dim + observation_dim) ]
             if self.ema_model.returns_condition:
@@ -299,7 +296,7 @@ class Trainer(object):
             if self.ema_model.model.calc_energy:
                 samples = self.ema_model.grad_conditional_sample(conditions, returns=returns)
             else:
-                samples = self.ema_model.conditional_sample(conditions, returns=returns, text_cond=text_cond)
+                samples = self.ema_model.conditional_sample(conditions, returns=returns)
 
             samples = to_np(samples)
 

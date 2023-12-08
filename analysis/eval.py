@@ -6,7 +6,7 @@ if __name__ == '__main__':
     from config.locomotion_config import Config
     from params_proto.neo_hyper import Sweep
 
-    sweep = Sweep(RUN, Config).load("default_inv.jsonl")
+    sweep = Sweep(RUN, Config).load("kitchen_inv.jsonl")
 
     for kwargs in sweep:
         logger.print(RUN.prefix, color='green')

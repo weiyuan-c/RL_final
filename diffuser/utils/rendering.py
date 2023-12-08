@@ -15,19 +15,6 @@ from ml_logger import logger
 
 from diffuser.datasets.d4rl import load_environment
 
-from matplotlib import animation
-import matplotlib.pyplot as plt
-import numpy as np
-
-def save_imgs_as_gif(frames, path='./', filename='kitchen.gif'):
-    plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
-
-    patch = plt.imshow(frames[0])
-    def animate(i):
-        patch.set_data(frames[i])
-    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
-    anim.save(path + filename, writer='imagemagick', fps=60)
-
 #-----------------------------------------------------------------------------#
 #------------------------------- helper structs ------------------------------#
 #-----------------------------------------------------------------------------#

@@ -60,7 +60,6 @@ def main(**deps):
             savepath='model_config.pkl',
             horizon=Config.horizon,
             transition_dim=observation_dim,
-            # transition_dim=observation_dim + action_dim,
             cond_dim=observation_dim,
             dim_mults=Config.dim_mults,
             returns_condition=Config.returns_condition,
@@ -96,7 +95,7 @@ def main(**deps):
             Config.model,
             savepath='model_config.pkl',
             horizon=Config.horizon,
-            transition_dim=observation_dim,
+            transition_dim=observation_dim + action_dim,
             cond_dim=observation_dim,
             dim_mults=Config.dim_mults,
             returns_condition=Config.returns_condition,
@@ -161,8 +160,6 @@ def main(**deps):
 
     logger.print('Testing forward...', end=' ', flush=True)
     batch = utils.batchify(dataset[0], Config.device)
-    # print(batch)
-    # breakpoint()
     loss, _ = diffusion.loss(*batch)
     loss.backward()
     logger.print('✓')

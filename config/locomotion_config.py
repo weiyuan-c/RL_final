@@ -6,13 +6,13 @@ class Config(ParamsProto):
     # misc
     seed = 100
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    bucket = '/home/sonicbenz/Benz/course/RL/RL_final/analysis/weights' #'/home/yanyangji/research/RL/final/decision-diffuser/code/output'
-    dataset = 'kitchen-partial-v0' #'hopper-medium-expert-v2'
+    bucket = '/home/sonicbenz/Benz/course/RL/decision-diffuser/code/analysis/weights/'
+    dataset = 'kitchen-partial-v0'
 
     ## model
     model = 'models.TemporalUnet'
     diffusion = 'models.GaussianInvDynDiffusion'
-    horizon = 100
+    horizon = 56
     n_diffusion_steps = 200
     action_weight = 10
     loss_weights = None
@@ -56,4 +56,4 @@ class Config(ParamsProto):
     n_saves = 5
     save_parallel = False
     n_reference = 8
-    save_checkpoints = True
+    save_checkpoints = False

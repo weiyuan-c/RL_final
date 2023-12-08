@@ -92,8 +92,7 @@ def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
 
 def apply_conditioning(x, conditions, action_dim):
     for t, val in conditions.items():
-        x[:, t, action_dim:] = val.clone() # batch size, time step, trajectory (all observation)
-    # x[:, 0, :] = conditions.clone()
+        x[:, t, action_dim:] = val.clone()
     return x
 
 #-----------------------------------------------------------------------------#
