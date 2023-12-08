@@ -7,7 +7,7 @@ class Config(ParamsProto):
     seed = 100
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     bucket = '/home/sonicbenz/Benz/course/RL/RL_final/analysis/weights' #'/home/yanyangji/research/RL/final/decision-diffuser/code/output'
-    dataset = 'kitchen-mixed-v0' #'hopper-medium-expert-v2'
+    dataset = 'kitchen-partial-v0' #'hopper-medium-expert-v2'
 
     ## model
     model = 'models.TemporalUnet'
@@ -56,4 +56,4 @@ class Config(ParamsProto):
     n_saves = 5
     save_parallel = False
     n_reference = 8
-    save_checkpoints = False
+    save_checkpoints = True

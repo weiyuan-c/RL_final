@@ -5,11 +5,12 @@ from copy import deepcopy
 import numpy as np
 import os
 import gym
+import clip
 from config.locomotion_config import Config
 from diffuser.utils.arrays import to_torch, to_np, to_device
 from diffuser.datasets.d4rl import suppress_output
 from diffuser.utils.rendering import save_imgs_as_gif
-# from .render_one_epoch import run_one_epoch
+from .render_one_epoch import run_one_epoch
 import pdb
 
 def evaluate(**deps):
@@ -32,10 +33,10 @@ def evaluate(**deps):
 
     loadpath = os.path.join(Config.bucket, logger.prefix, 'checkpoint')
     
-    if Config.save_checkpoints:
-        loadpath = os.path.join(loadpath, f'state_{self.step}.pt')
-    else:
-        loadpath = os.path.join(loadpath, 'state.pt')
+    # if Config.save_checkpoints:
+    #     loadpath = os.path.join(loadpath, f'state_{self.step}.pt')
+    # else:
+    loadpath = os.path.join(loadpath, 'state.pt')
     
     state_dict = torch.load(loadpath, map_location=Config.device)
 
@@ -130,16 +131,23 @@ def evaluate(**deps):
     trainer.model.load_state_dict(state_dict['model'])
     trainer.ema_model.load_state_dict(state_dict['ema'])
 
-    num_eval = 10
+    num_eval = 1
     device = Config.device
 
     env_list = [gym.make(Config.dataset) for _ in range(num_eval)]
+    # Change tasks
+    for i in range(len(env_list)):
+        env_list[i].tasks_to_complete = ['kettle', 'light switch', 'microwave', 'slide cabinet']
+
     renderer = [env.sim_robot.renderer for env in env_list]
+    for i in range(len(renderer)):
+        renderer[i]._camera_settings['azimuth'] = 90.
+        renderer[i]._camera_settings['elevation'] = -10.
+        renderer[i]._camera_settings['lookat'][1] = 0.0
+        renderer[i]._camera_settings['distance'] = 3.0
     rendered_frames = [[] for env in env_list]
     dones = [0 for _ in range(num_eval)]
     episode_rewards = [0 for _ in range(num_eval)]
-
-    # run_one_epoch(env_list[0], dataset)
 
     assert trainer.ema_model.condition_guidance_w == Config.condition_guidance_w
     returns = to_device(Config.test_ret * torch.ones(num_eval, 1), device)
@@ -152,7 +160,11 @@ def evaluate(**deps):
     while sum(dones) <  num_eval:
         obs = dataset.normalizer.normalize(obs, 'observations')
         conditions = {0: to_torch(obs, device=device)}
-        samples = trainer.ema_model.conditional_sample(conditions, returns=returns)
+        text_cond = []
+        for i in range(len(env_list)):
+            text_cond.append(env_list[i].tasks_to_complete[0])
+        text_cond = dataset.clip.encode_text(clip.tokenize(text_cond).to(device)).unsqueeze(1).repeat(1, Config.horizon, 1)
+        samples = trainer.ema_model.conditional_sample(conditions, returns=returns, text_cond=text_cond)
         obs_comb = torch.cat([samples[:, 0, :], samples[:, 1, :]], dim=-1)
         obs_comb = obs_comb.reshape(-1, 2*observation_dim)
         action = trainer.ema_model.inv_model(obs_comb)

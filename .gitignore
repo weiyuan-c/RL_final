@@ -4,4 +4,6 @@
 *.pyc
 *.ipynb
 *.pkl
+*.log
+*.gif
 analysis/diffuser
