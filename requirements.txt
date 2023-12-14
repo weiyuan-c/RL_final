@@ -1,8 +1,11 @@
-numpy==1.23.0
-mujoco-py
+numpy==1.19.5
+gym==0.18.0
+mujoco-py==2.0.2.13
 matplotlib==3.3.4
+torch==1.7.1+cu101
+torchvision==0.8.2+cu101
 typed-argument-parser
-git+https://github.com/rail-berkeley/d4rl@master#egg=d4rl
+git+https://github.com/rail-berkeley/d4rl.git@c39eefd68d2f3277ca68e996a45ce1dd24e65625
 scikit-image==0.17.2
 scikit-video==1.1.11
 gitpython
@@ -10,11 +13,3 @@ einops
 pillow
 tqdm
 pandas
-wandb
-flax>=0.3.5
-jax<=0.2.21
-ray==1.9.1
-crcmod
-ml_logger==0.8.69
-jaynes==0.8.11
-params_proto==2.9.6
